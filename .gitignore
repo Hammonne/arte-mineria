@@ -1,0 +1,18 @@
+# imágenes de referencia de estilo
+Style Made Simple-*.png
+
+# datos descargados (≈400 MB) — se regeneran con scripts/01_descargar.py
+datos/
+
+# resultados pesados — se regeneran con los scripts (el video va como Release o Drive)
+salida/cuadros/
+salida/*.mp4
+salida/*.tif
+salida/*.joblib
+salida/final_sangre_prueba.png
+
+# logs y basura
+*.log
+__pycache__/
+.DS_Store
+*.tmp.tif

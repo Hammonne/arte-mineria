@@ -1,0 +1,15 @@
+name: mineria
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - earthengine-api
+  - numpy=1.26
+  - scipy
+  - scikit-learn
+  - scikit-image
+  - rasterio
+  - matplotlib
+  - pillow
+  - joblib
+  - ffmpeg
