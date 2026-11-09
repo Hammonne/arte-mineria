@@ -16,3 +16,10 @@ salida/final_sangre_prueba.png
 __pycache__/
 .DS_Store
 *.tmp.tif
+
+# imágenes generadas pesadas / pruebas
+web/frames/
+web/datos.js
+salida/*.zip
+salida/*.png
+salida/prueba_estilo/
