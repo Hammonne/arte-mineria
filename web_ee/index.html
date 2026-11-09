@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Venas de oro</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=Inter:wght@400;500&display=swap">
+<style>
+  :root { --fondo:#0b120e; --panel:rgba(11,18,14,.86); --borde:rgba(232,196,150,.18);
+          --texto:#e9e2cf; --tenue:#8fa59a; --oro:#e8c496;
+          --serif:"Fraunces",Georgia,serif; --sans:"Inter",system-ui,sans-serif; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fondo:#0b120e; } }
+  :root[data-theme="dark"] { --fondo:#0b120e; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--fondo); color:var(--texto); font-family:var(--sans); overflow:hidden; }
+  #mapa { position:absolute; inset:0; background:var(--fondo); }
+  .leaflet-container { background:var(--fondo); font-family:var(--sans); }
+
+  .lado { position:absolute; top:14px; left:14px; z-index:1000; width:270px; max-width:calc(100% - 28px);
+          background:var(--panel); border:1px solid var(--borde); border-radius:14px; padding:14px 14px 10px;
+          backdrop-filter:blur(8px); }
+  h1 { font-family:var(--serif); font-weight:300; font-size:30px; margin:0; color:var(--oro); line-height:1; }
+  .sub { color:var(--tenue); font-size:12px; margin:6px 0 12px; }
+  .lugares { display:flex; flex-direction:column; gap:5px; }
+  .lugares button { all:unset; cursor:pointer; padding:7px 11px; border-radius:8px; font-size:13px;
+                    border:1px solid var(--borde); color:var(--texto); }
+  .lugares button:hover, .lugares button.activa { border-color:var(--oro); color:var(--oro); }
+  .lugares button:focus-visible { outline:2px solid var(--oro); outline-offset:2px; }
+  label.chk { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--tenue); margin-top:12px; cursor:pointer; }
+  .nota { font-size:11px; color:var(--tenue); margin-top:10px; line-height:1.45; }
+
+  .panel { position:absolute; left:50%; transform:translateX(-50%); bottom:16px; z-index:1000;
+           width:min(700px, calc(100% - 28px)); background:var(--panel); border:1px solid var(--borde);
+           border-radius:14px; padding:12px 16px 10px; backdrop-filter:blur(8px); }
+  .fila { display:flex; align-items:baseline; gap:14px; }
+  .anio { font-family:var(--serif); font-size:48px; font-weight:500; color:var(--oro); line-height:1;
+          font-variant-numeric:tabular-nums; }
+  .fuente { font-size:12px; color:var(--tenue); text-transform:uppercase; letter-spacing:.1em; }
+  .cargando { margin-left:auto; font-size:12px; color:var(--oro); opacity:0; transition:opacity .3s; }
+  .cargando.si { opacity:1; }
+  .controles { display:flex; align-items:center; gap:12px; margin-top:8px; }
+  .controles button { all:unset; cursor:pointer; width:36px; height:36px; border-radius:50%; display:grid;
+                      place-items:center; background:var(--oro); color:#1a1408; flex:none; }
+  input[type=range] { flex:1; accent-color:var(--oro); min-width:0; }
+  .marcas { display:flex; justify-content:space-between; font-size:10px; color:var(--tenue); margin:2px 48px 0; }
+  .leaflet-bar a { background:var(--panel)!important; color:var(--texto)!important; border-color:var(--borde)!important; }
+  .leaflet-control-attribution { background:rgba(0,0,0,.5)!important; color:var(--tenue)!important; }
+  .leaflet-control-attribution a { color:var(--tenue)!important; }
+
+  @media (max-width:640px) {
+    .lado { width:auto; right:14px; padding:10px; }
+    .lugares { flex-direction:row; overflow-x:auto; }
+    .lugares button { white-space:nowrap; }
+    .nota { display:none; }
+  }
+</style>
+</head>
+<body>
+<div id="mapa"></div>
+
+<aside class="lado">
+  <h1>Venas de oro</h1>
+  <div class="sub">Minería aurífera en Madre de Dios, Perú · imágenes satelitales reales</div>
+  <div class="lugares" id="lugares"></div>
+  <label class="chk"><input type="checkbox" id="alta" checked> Alta resolución (Sentinel-2, 10 m, desde 2017)</label>
+  <div class="nota">Haz zoom: la imagen se recalcula con más detalle. Dorado = ríos con sedimento, tierra
+    removida y pozas mineras. Línea fina = límite de Madre de Dios.</div>
+</aside>
+
+<section class="panel">
+  <div class="fila">
+    <div class="anio" id="anio">2024</div>
+    <div class="fuente" id="fuente"></div>
+    <div class="cargando" id="cargando">cargando…</div>
+  </div>
+  <div class="controles">
+    <button id="play" aria-label="Reproducir">
+      <svg id="icono" width="16" height="16" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z" fill="currentColor"/></svg>
+    </button>
+    <input type="range" id="tiempo" min="1985" max="2025" value="2024" step="1" aria-label="Año">
+  </div>
+  <div class="marcas"><span>1985</span><span>2005</span><span>2025</span></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  const LUGARES = [
+    { nombre: "Toda la región", c: [-12.2, -70.2], z: 8 },
+    { nombre: "Huepetuhe", c: [-12.933, -70.508], z: 12 },
+    { nombre: "La Pampa / Interoceánica", c: [-12.878, -70.008], z: 12 },
+    { nombre: "Río Madre de Dios (Boca Colorado)", c: [-12.661, -70.425], z: 12 },
+    { nombre: "Río Madre de Dios (Laberinto)", c: [-12.654, -69.717], z: 12 },
+  ];
+  const $ = id => document.getElementById(id);
+  const map = L.map("mapa", { zoomControl: false, minZoom: 5, maxZoom: 16 }).setView(LUGARES[0].c, LUGARES[0].z);
+  L.control.zoom({ position: "topright" }).addTo(map);
+  map.attributionControl.addAttribution("Landsat (USGS/NASA) · Sentinel-2 (ESA) · Google Earth Engine");
+
+  // lugares
+  const nav = $("lugares");
+  LUGARES.forEach((l, k) => {
+    const b = document.createElement("button");
+    b.textContent = l.nombre;
+    if (!k) b.classList.add("activa");
+    b.onclick = () => { map.flyTo(l.c, l.z, { duration: 1.5 });
+                        nav.querySelectorAll("button").forEach(x => x.classList.toggle("activa", x === b)); };
+    nav.appendChild(b);
+  });
+
+  fetch("/api/limite").then(r => r.json()).then(d =>
+    L.tileLayer(d.url, { pane: "overlayPane", zIndex: 650, maxZoom: 16 }).addTo(map));
+
+  // capa del año: la nueva se agrega ENCIMA y la vieja se quita cuando la nueva terminó de cargar
+  let actual = null, pedido = 0;
+  async function mostrar(anio) {
+    const n = ++pedido;
+    $("anio").textContent = anio;
+    $("cargando").classList.add("si");
+    const r = await fetch(`/api/capa?anio=${anio}&alta=${$("alta").checked ? 1 : 0}`);
+    const d = await r.json();
+    if (n !== pedido) return;
+    if (d.error) { $("fuente").textContent = "error: " + d.error; return; }
+    $("fuente").textContent = d.fuente;
+    const capa = L.tileLayer(d.url, { maxZoom: 16, zIndex: 10 + n });
+    await new Promise(ok => { capa.once("load", ok); capa.addTo(map); setTimeout(ok, 15000); });
+    if (n !== pedido) { map.removeLayer(capa); return; }
+    if (actual) map.removeLayer(actual);
+    actual = capa;
+    $("cargando").classList.remove("si");
+  }
+
+  const slider = $("tiempo");
+  let t = null;
+  slider.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => mostrar(+slider.value), 250); });
+  $("alta").addEventListener("change", () => mostrar(+slider.value));
+
+  // play: avanza solo cuando el año anterior terminó de cargar (sin parpadeo)
+  let jugando = false;
+  const icono = $("icono");
+  $("play").onclick = async () => {
+    jugando = !jugando;
+    icono.innerHTML = jugando ? '<path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/>'
+                              : '<path d="M4 2l10 6-10 6z" fill="currentColor"/>';
+    if (jugando && +slider.value >= 2025) slider.value = 1985;
+    while (jugando && +slider.value <= 2025) {
+      await mostrar(+slider.value);
+      await new Promise(r => setTimeout(r, 500));
+      if (!jugando || +slider.value >= 2025) break;
+      slider.value = +slider.value + 1;
+    }
+    jugando = false;
+    icono.innerHTML = '<path d="M4 2l10 6-10 6z" fill="currentColor"/>';
+  };
+
+  mostrar(2024);
+})();
+</script>
+</body>
+</html>
