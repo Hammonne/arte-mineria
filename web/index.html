@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Venas de oro</title>
+<meta name="description" content="Minería aurífera en Madre de Dios, Perú: 1985–2024 con datos satelitales y una proyección especulativa hasta 2070.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=Inter:wght@400;500&display=swap">
+<style>
+  :root {
+    --fondo: #050807;
+    --panel: rgba(8, 16, 14, 0.82);
+    --borde: rgba(238, 214, 160, 0.16);
+    --texto: #e9e2cf;
+    --tenue: #8fa59a;
+    --oro: #eed6a0;
+    --sangre: #b0141c;
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "Inter", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fondo: #050807; } }
+  :root[data-theme="dark"] { --fondo: #050807; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
+               font-family: var(--sans); overflow: hidden; }
+  #mapa { position: absolute; inset: 0; background: var(--fondo); }
+  .leaflet-container { background: var(--fondo); font-family: var(--sans); }
+  .cuadro { transition: opacity .45s ease; image-rendering: auto; }
+
+  .titulo { position: absolute; top: 16px; left: 16px; z-index: 1000; max-width: min(360px, calc(100% - 90px));
+            pointer-events: none; }
+  .titulo h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(26px, 4vw, 40px);
+               margin: 0; color: var(--oro); letter-spacing: .01em; line-height: 1.05; }
+  .titulo p { margin: 6px 0 0; color: var(--tenue); font-size: 13px; }
+
+  .zonas { position: absolute; top: 96px; left: 16px; z-index: 1000; display: flex; flex-direction: column;
+           gap: 6px; max-width: calc(100% - 32px); }
+  .zonas button { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 999px; font-size: 13px;
+                  background: var(--panel); border: 1px solid var(--borde); color: var(--texto);
+                  backdrop-filter: blur(6px); white-space: nowrap; }
+  .zonas button:hover, .zonas button.activa { border-color: var(--oro); color: var(--oro); }
+  .zonas button:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+
+  .panel { position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 1000;
+           width: min(760px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--borde);
+           border-radius: 14px; padding: 14px 18px 12px; backdrop-filter: blur(8px); }
+  .fila { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .anio { font-family: var(--serif); font-size: clamp(36px, 6vw, 54px); font-weight: 500; color: var(--oro);
+          line-height: 1; min-width: 2.6em; transition: color .6s; font-variant-numeric: tabular-nums; }
+  .etiqueta { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--tenue); }
+  .etiqueta.proy { color: #d9a65a; }
+  .cifras { margin-left: auto; display: flex; gap: 20px; font-variant-numeric: tabular-nums; }
+  .cifra b { display: block; font-size: 18px; font-weight: 500; color: var(--texto); }
+  .cifra span { font-size: 11px; color: var(--tenue); }
+  .controles { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .controles button { all: unset; cursor: pointer; width: 38px; height: 38px; border-radius: 50%;
+                      display: grid; place-items: center; background: var(--oro); color: #1a1408; flex: none; }
+  .controles button:focus-visible { outline: 2px solid var(--texto); outline-offset: 2px; }
+  input[type=range] { flex: 1; accent-color: var(--oro); min-width: 0; }
+  select { background: transparent; color: var(--tenue); border: 1px solid var(--borde); border-radius: 6px;
+           padding: 4px 6px; font: inherit; font-size: 12px; }
+  .marcas { display: flex; justify-content: space-between; font-size: 10px; color: var(--tenue);
+            margin: 4px 50px 0 50px; }
+
+  .info { position: absolute; right: 16px; bottom: 18px; z-index: 1001; }
+  .info > button { all: unset; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; display: grid;
+                   place-items: center; background: var(--panel); border: 1px solid var(--borde); color: var(--tenue); }
+  .info .caja { display: none; position: absolute; right: 0; bottom: 44px; width: min(340px, calc(100vw - 32px));
+                background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 14px 16px;
+                font-size: 12.5px; line-height: 1.5; color: var(--texto); backdrop-filter: blur(8px); }
+  .info.abierta .caja { display: block; }
+  .info .caja h2 { font-family: var(--serif); font-weight: 500; font-size: 16px; margin: 0 0 6px; color: var(--oro); }
+  .info .caja p { margin: 0 0 8px; }
+  .info .caja small { color: var(--tenue); }
+
+  .cierre { position: absolute; inset: 0; z-index: 999; display: grid; place-items: center; pointer-events: none;
+            opacity: 0; transition: opacity 1.5s; }
+  .cierre.visible { opacity: 1; }
+  .cierre p { font-family: var(--serif); font-weight: 300; font-size: clamp(20px, 3.4vw, 34px); color: #f1d3cf;
+              text-align: center; max-width: 20em; padding: 0 16px; text-shadow: 0 2px 24px #000; }
+
+  .leaflet-control-layers, .leaflet-bar a { background: var(--panel) !important; color: var(--texto) !important;
+                                            border-color: var(--borde) !important; }
+  .leaflet-control-attribution { background: rgba(0,0,0,.5) !important; color: var(--tenue) !important; }
+  .leaflet-control-attribution a { color: var(--tenue) !important; }
+  .leaflet-tooltip.nombre-zona { background: transparent; border: 0; box-shadow: none; color: var(--oro);
+                                 font-size: 12px; text-shadow: 0 1px 4px #000; }
+  .leaflet-tooltip.nombre-zona::before { display: none; }
+
+  @media (max-width: 640px) {
+    .zonas { top: auto; bottom: 196px; flex-direction: row; overflow-x: auto; left: 16px; right: 16px; }
+    .cifras { margin-left: 0; width: 100%; }
+    .info { bottom: auto; top: 16px; }
+    .info .caja { bottom: auto; top: 44px; }
+    .marcas { margin: 4px 0 0; }
+  }
+</style>
+</head>
+<body>
+<div id="mapa" role="application" aria-label="Mapa de Madre de Dios"></div>
+
+<div class="titulo">
+  <h1>Venas de oro</h1>
+  <p>Minería aurífera en Madre de Dios, Perú</p>
+</div>
+
+<nav class="zonas" id="zonas" aria-label="Ir a una zona"></nav>
+
+<div class="cierre" id="cierre"><p>Si la minería sigue creciendo como en la última década, en 2070 no quedaría río sin oro… ni sin mercurio.</p></div>
+
+<section class="panel" aria-label="Línea de tiempo">
+  <div class="fila">
+    <div class="anio" id="anio">1985</div>
+    <div class="etiqueta" id="etiqueta">datos satelitales</div>
+    <div class="cifras">
+      <div class="cifra"><b id="km2">–</b><span>km² de minería</span></div>
+      <div class="cifra"><b id="rios">–</b><span>ríos contaminados</span></div>
+    </div>
+  </div>
+  <div class="controles">
+    <button id="play" aria-label="Reproducir">
+      <svg id="icono" width="16" height="16" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z" fill="currentColor"/></svg>
+    </button>
+    <input type="range" id="tiempo" min="0" value="0" step="1" aria-label="Año">
+    <select id="velocidad" aria-label="Velocidad">
+      <option value="1200">lento</option>
+      <option value="650" selected>normal</option>
+      <option value="300">rápido</option>
+    </select>
+  </div>
+  <div class="marcas"><span>1985</span><span>2024 · hoy</span><span id="marca-fin">2070</span></div>
+</section>
+
+<div class="info" id="info">
+  <button aria-label="Acerca de" aria-expanded="false" id="info-btn">?</button>
+  <div class="caja">
+    <h2>Qué estás viendo</h2>
+    <p><b>1985–2024:</b> imágenes Landsat reales, una por año. El dorado son los ríos cargados de sedimento y
+       las zonas mineras. Las venas brillantes siguen el agua río abajo desde cada mina: por ahí viaja la contaminación.</p>
+    <p><b>2025–2070:</b> proyección <i>especulativa</i>. Supone que la minería sigue creciendo un 9,4 % al año
+       (la tasa de 2014–2024) y que se expande desde donde ya existe, según un modelo entrenado con la historia.
+       No es un pronóstico.</p>
+    <p>Las zonas mineras se ven a 30 m por píxel y el resto de la región a 120 m. Entre 1985 y 1996 hay
+       pocas imágenes y muchas nubes: el bosque de fondo se toma de 1997–2001, pero la minería y los ríos
+       son los de cada año.</p>
+    <small>Datos: MapBiomas Perú (col. 3), Landsat 5/7/8/9 (USGS/NASA), MERIT Hydro, SRTM, WDPA.
+      Mapa base e imágenes satelitales actuales © Esri y colaboradores.</small>
+  </div>
+</div>
+
+<script src="datos.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  const D = window.DATOS;
+  const pasos = [...D.anios.map(a => ({ anio: a })),
+                 ...Array.from({ length: D.nSangre }, (_, i) => ({ sangre: i + 1, anio: D.anios.at(-1) }))];
+  const ultimo = D.anios.at(-1);
+  const $ = id => document.getElementById(id);
+  $("marca-fin").textContent = ultimo;
+  const slider = $("tiempo");
+  slider.max = pasos.length - 1;
+
+  // ---------- mapa ----------
+  const map = L.map("mapa", { zoomControl: false, minZoom: 6, maxZoom: 15, zoomSnap: 0.25,
+                              maxBounds: L.latLngBounds(D.region.limites).pad(0.6) });
+  L.control.zoom({ position: "topright" }).addTo(map);
+  const bases = {
+    "Oscuro": L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 16, attribution: "Mapa base © Esri, HERE, Garmin, © OpenStreetMap" }),
+    "Satélite actual (Esri)": L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, attribution: "Imágenes © Esri, Maxar, Earthstar Geographics" }),
+    "Sin mapa base": L.layerGroup(),
+  };
+  bases["Oscuro"].addTo(map);
+  L.control.layers(bases, null, { position: "topright" }).addTo(map);
+  const ancho = () => window.innerWidth > 640;
+  const margen = () => ancho() ? { paddingTopLeft: [270, 20], paddingBottomRight: [20, 170] }
+                               : { paddingTopLeft: [10, 70], paddingBottomRight: [10, 250] };
+  map.fitBounds(D.region.limites, margen());
+
+  // ---------- capas de imágenes con fundido (doble buffer) ----------
+  const url = (capa, p) => `frames/${capa}/${p.sangre ? "sangre_" + p.sangre : p.anio}.webp`;
+  class Capa {
+    constructor(id, limites, z) {
+      this.id = id;
+      this.limites = L.latLngBounds(limites);
+      const pane = map.createPane("p_" + id);
+      pane.style.zIndex = z;
+      const op = { pane: "p_" + id, className: "cuadro", interactive: false };
+      this.buf = [L.imageOverlay(url(id, pasos[0]), limites, { ...op, opacity: 1 }).addTo(map),
+                  L.imageOverlay(url(id, pasos[0]), limites, { ...op, opacity: 0 }).addTo(map)];
+      this.vis = 0;
+      this.pedido = 0;
+    }
+    mostrar(p) {
+      const u = url(this.id, p);
+      const n = ++this.pedido;
+      const img = new Image();
+      img.onload = () => {
+        if (n !== this.pedido) return;               // llegó tarde: ya se pidió otro año
+        const sig = 1 - this.vis;
+        this.buf[sig].setUrl(u);
+        this.buf[sig].bringToFront();
+        // la imagen nueva aparece ENCIMA de la vieja (que sigue al 100%);
+        // recién cuando la nueva está completa se oculta la vieja -> nunca se ve el fondo
+        const viejo = this.buf[this.vis];
+        this.vis = sig;
+        requestAnimationFrame(() => {
+          this.buf[sig].setOpacity(1);
+          setTimeout(() => { if (this.buf[this.vis] !== viejo) viejo.setOpacity(0); }, 480);
+        });
+      };
+      img.src = u;
+    }
+    precargar(p) { new Image().src = url(this.id, p); }
+    visible() { return map.getBounds().intersects(this.limites); }
+  }
+  const region = new Capa("region", D.region.limites, 410);
+  const zonas = D.zonas.map((z, i) => new Capa(z.id, z.limites, 420 + i));
+
+  // marcos y nombres de las zonas (nombres solo al acercarse, para que no se encimen)
+  map.createPane("marcos").style.zIndex = 450;
+  const marcos = D.zonas.map(z =>
+    L.rectangle(z.limites, { pane: "marcos", color: "#eed6a0", weight: 1, opacity: .5, fill: false,
+                             dashArray: "4 6", interactive: false }).addTo(map)
+      .bindTooltip(z.nombre, { permanent: true, direction: "top", className: "nombre-zona",
+                               offset: [0, -4], pane: "marcos" }));
+  const nombres = () => marcos.forEach(m => map.getZoom() >= 8.5 ? m.openTooltip() : m.closeTooltip());
+  map.on("zoomend", nombres);
+
+  // ---------- botones de zonas ----------
+  const nav = $("zonas");
+  const boton = (texto, limites) => {
+    const b = document.createElement("button");
+    b.textContent = texto;
+    b.onclick = () => {
+      map.flyToBounds(limites, { duration: 1.6, ...margen() });
+      nav.querySelectorAll("button").forEach(x => x.classList.toggle("activa", x === b));
+    };
+    nav.appendChild(b);
+    return b;
+  };
+  boton("Toda la región", D.region.limites).classList.add("activa");
+  D.zonas.forEach(z => boton(z.nombre, z.limites));
+
+  // ---------- línea de tiempo ----------
+  const fmt = new Intl.NumberFormat("es-PE", { maximumFractionDigits: 0 });
+  let i = 0;
+  function ir(k) {
+    i = Math.max(0, Math.min(pasos.length - 1, k));
+    slider.value = i;
+    const p = pasos[i];
+    const r = D.resumen[p.anio] || {};
+    $("anio").textContent = p.anio;
+    $("anio").style.color = p.sangre ? "#d0242c" : "";
+    const proy = p.anio > D.ultimoReal;
+    $("etiqueta").textContent = p.sangre ? "proyección · final" : proy ? "proyección · si sigue la tendencia"
+                                                                     : "datos satelitales";
+    $("etiqueta").classList.toggle("proy", proy);
+    $("km2").textContent = r.km2 != null ? fmt.format(r.km2) : "–";
+    $("rios").textContent = r.rios != null ? `${fmt.format(r.rios)} %` : "–";
+    $("cierre").classList.toggle("visible", i === pasos.length - 1);
+    region.mostrar(p);
+    zonas.forEach(z => { if (z.visible()) z.mostrar(p); });
+    for (const d of [1, 2]) {
+      const q = pasos[i + d];
+      if (!q) break;
+      region.precargar(q);
+      zonas.forEach(z => z.visible() && z.precargar(q));
+    }
+  }
+  map.on("moveend", () => zonas.forEach(z => z.visible() && z.mostrar(pasos[i])));
+  slider.addEventListener("input", () => { parar(); ir(+slider.value); });
+
+  let timer = null;
+  const icono = $("icono");
+  const PLAY = '<path d="M4 2l10 6-10 6z" fill="currentColor"/>';
+  const PAUSA = '<path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/>';
+  function parar() { clearTimeout(timer); timer = null; icono.innerHTML = PLAY; $("play").ariaLabel = "Reproducir"; }
+  function tic() {
+    if (i >= pasos.length - 1) return parar();
+    ir(i + 1);
+    const ms = +$("velocidad").value * (pasos[i].sangre ? 1.6 : 1);
+    timer = setTimeout(tic, ms);
+  }
+  $("play").onclick = () => {
+    if (timer) return parar();
+    if (i >= pasos.length - 1) ir(0);
+    icono.innerHTML = PAUSA; $("play").ariaLabel = "Pausa";
+    timer = setTimeout(tic, 200);
+  };
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "SELECT") return;
+    if (e.code === "Space") { e.preventDefault(); $("play").click(); }
+    if (e.code === "ArrowRight") { parar(); ir(i + 1); }
+    if (e.code === "ArrowLeft") { parar(); ir(i - 1); }
+  });
+
+  const info = $("info");
+  $("info-btn").onclick = () => {
+    const ab = info.classList.toggle("abierta");
+    $("info-btn").setAttribute("aria-expanded", ab);
+  };
+
+  // links directos: ?zona=la_pampa&anio=2020
+  const q = new URLSearchParams(location.search);
+  const zq = D.zonas.find(z => z.id === q.get("zona"));
+  if (zq) map.fitBounds(zq.limites, margen());
+  const aq = q.get("anio") === "final" ? pasos.length - 1 : pasos.findIndex(p => p.anio === +q.get("anio"));
+  ir(aq > 0 ? aq : 0);
+  nombres();
+})();
+</script>
+</body>
+</html>

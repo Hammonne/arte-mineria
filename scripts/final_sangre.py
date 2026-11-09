@@ -19,7 +19,7 @@ def _suave(t):
 
 
 class FinalSangre:
-    def __init__(self, cuadro_final, semilla=3):
+    def __init__(self, cuadro_final, semilla=3, con_texto=True):
         F = cuadro_final.astype(np.float32)
         self.F = F
         R, G, B = F[..., 0], F[..., 1], F[..., 2]
@@ -27,9 +27,10 @@ class FinalSangre:
         # "venas": píxeles dorados/crema (R alto, B bajo)
         self.w = np.clip((R - B) / 140, 0, 1) * np.clip(lum / 170, 0, 1)
         H0 = lum.shape[0]
-        self.w_mapa = self.w.copy()          # sin el texto (no gotea)
-        self.w_mapa[:int(H0 * 0.12)] = 0
-        self.w_mapa[int(H0 * 0.92):] = 0
+        self.w_mapa = self.w.copy()
+        if con_texto:                        # el texto del video no gotea
+            self.w_mapa[:int(H0 * 0.12)] = 0
+            self.w_mapa[int(H0 * 0.92):] = 0
         self.lum = lum / 255
         H, W = lum.shape
         rng = np.random.default_rng(semilla)
